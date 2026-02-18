@@ -28,14 +28,14 @@ public class DashboardView : ViewBase
             new { Month = "May", Cohorts = 2 },
         };
 
-    // --- Activity feed ---
-    var activities = new[]
+    // --- Activity feed data ---
+    var activitiesData = new[]
     {
-            (Icon: Icons.CircleCheck, Text: "Updated 'New Prospect Cohort' to v2."),
-            (Icon: Icons.Info,        Text: "Processing cohort members for cohort ID 3..."),
-            (Icon: Icons.CircleCheck, Text: "Cohort 'New Prospect Cohort' is now active."),
-            (Icon: Icons.Clock,       Text: "Scheduled export for 'Active US Users'."),
-            (Icon: Icons.CircleCheck, Text: "Export completed for 'Recent Signups (EU)'."),
+            new { Cohort = "New Prospect Cohort", Action = "Updated",   Timestamp = "2 mins ago",  User = "joshuang" },
+            new { Cohort = "Active US Users",     Action = "Exported",  Timestamp = "1 hour ago",  User = "joshuang" },
+            new { Cohort = "Recent Signups (EU)", Action = "Created",   Timestamp = "3 hours ago", User = "admin" },
+            new { Cohort = "New Prospect Cohort", Action = "Scheduled", Timestamp = "5 hours ago", User = "joshuang" },
+            new { Cohort = "All Customers",       Action = "Created",   Timestamp = "Yesterday",   User = "system" },
         };
 
     // --- Stat cards ---
@@ -77,15 +77,13 @@ public class DashboardView : ViewBase
         | barChart
         | lineChart;
 
-    // --- Activity feed ---
+    // --- Activity feed table ---
     var activityFeed = new Card(
         Layout.Vertical().Gap(3)
             | Text.P("Recent Activity")
-            | (Layout.Vertical().Gap(2)
-                | activities.Select(a =>
-                    (object)(Layout.Horizontal().Gap(3).Align(Align.Center)
-                        | new Icon(a.Icon)
-                        | Text.P(a.Text).Small())))
+            | activitiesData.ToTable()
+                .Width(Size.Full())
+                .Header(p => p.Cohort, "Cohort Name")
     );
 
     return Layout.Vertical().Gap(6).Padding(6)

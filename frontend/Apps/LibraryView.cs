@@ -2,19 +2,12 @@ namespace Frontend.Apps;
 
 public class LibraryView : ViewBase
 {
-  record CohortEntry(string Name, int Version, int Members, string RefreshedDate, string Tag);
-
-  static readonly CohortEntry[] SampleCohorts =
-  {
-        new("Active US Users",      3, 8919, "2025-08-20", "High-Value"),
-        new("Recent Signups (EU)",  1, 8380, "2025-08-21", "New"),
-        new("New Prospect Cohort",  1, 6700, "2025-08-22", "New"),
-    };
-
+  readonly IState<Cohort[]> _cohorts;
   readonly Action<string> _navigateTo;
 
-  public LibraryView(Action<string> navigateTo)
+  public LibraryView(IState<Cohort[]> cohorts, Action<string> navigateTo)
   {
+    _cohorts = cohorts;
     _navigateTo = navigateTo;
   }
 
@@ -27,7 +20,7 @@ public class LibraryView : ViewBase
     string[] filters = { "All", "New", "High-Value", "Archived", "Marketing" };
 
     // Filter cohorts
-    var filtered = SampleCohorts
+    var filtered = _cohorts.Value
         .Where(c => (activeFilter.Value == "All" || c.Tag == activeFilter.Value)
                  && (search.Value == "" || c.Name.Contains(search.Value, StringComparison.OrdinalIgnoreCase)))
         .ToArray();

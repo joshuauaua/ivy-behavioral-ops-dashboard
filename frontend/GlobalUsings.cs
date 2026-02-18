@@ -28,3 +28,5 @@ global using System.Globalization;
 global using System.Reactive.Linq;
 
 namespace Frontend;
+
+public record Cohort(string Name, int Version, int Members, string RefreshedDate, string Tag, string[] Blocks);

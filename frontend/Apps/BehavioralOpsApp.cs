@@ -6,14 +6,20 @@ public class BehavioralOpsApp : ViewBase
   public override object? Build()
   {
     var activePage = UseState("builder");
+    var cohorts = UseState(new Cohort[]
+    {
+        new("Active US Users",      3, 8919, "2025-08-20", "High-Value", Array.Empty<string>()),
+        new("Recent Signups (EU)",  1, 8380, "2025-08-21", "New", Array.Empty<string>()),
+        new("New Prospect Cohort",  1, 6700, "2025-08-22", "New", Array.Empty<string>()),
+    });
 
     object GetPageContent() => activePage.Value switch
     {
-      "builder" => new BuilderView(),
+      "builder" => new BuilderView(cohorts, page => activePage.Value = page),
       "dashboard" => new DashboardView(),
-      "library" => new LibraryView(navigateTo: page => activePage.Value = page),
+      "library" => new LibraryView(cohorts, navigateTo: page => activePage.Value = page),
       "testing" => new TestingView(),
-      _ => new BuilderView()
+      _ => new BuilderView(cohorts, page => activePage.Value = page)
     };
 
     var header = new Card(

@@ -1,0 +1,15 @@
+[Bb]in/
+[Oo]bj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.DS_Store
+frontend/bin/
+frontend/obj/
+BehavioralOps.Backend/bin/
+BehavioralOps.Backend/obj/
+behavioral_ops.db
+behavioral_ops.db-journal

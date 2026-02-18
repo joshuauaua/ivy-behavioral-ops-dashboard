@@ -33,20 +33,33 @@ public class BuilderView : ViewBase
     var isEditingName = UseState(false);
     var client = UseService<IClientProvider>();
 
+    // Export Dialog State
+    var exportState = new ExportDialog.State(
+        UseState(false),
+        UseState("CSV"),
+        UseState(true),
+        UseState(true),
+        UseState(true),
+        UseState(false),
+        UseState(false),
+        UseState("")
+    );
+    var operators = UseState(Array.Empty<string>());
+
     // Realtime count (number of blocks added as a proxy)
     int count = canvasBlocks.Value.Length * 1247; // simulated count
 
     var titleContent = isEditingName.Value
-        ? Layout.Horizontal().Gap(2).Align(Align.Center)
+        ? Layout.Horizontal().Gap(2).Align(Align.Left)
             | new TextInput(cohortName, placeholder: "Cohort name...")
             | new Button().Icon(Icons.Check).Variant(ButtonVariant.Ghost).HandleClick(_ => isEditingName.Set(false))
-        : Layout.Horizontal().Gap(2).Align(Align.Center)
+        : Layout.Horizontal().Gap(2).Align(Align.Left)
             | Text.H3(cohortName.Value)
             | new Button().Icon(Icons.Pencil).Variant(ButtonVariant.Ghost).HandleClick(_ => isEditingName.Set(true));
 
     var headerCard = new Card(
-        Layout.Vertical().Gap(4).Width(Size.Full())
-            | (Layout.Vertical().Gap(1)
+        Layout.Vertical().Gap(2).Align(Align.Left).Width(Size.Full())
+            | (Layout.Vertical().Gap(1).Align(Align.Left)
                 | titleContent
                 | Text.P("Define your target audience by combining filters.").Muted())
             | (Layout.Horizontal().Gap(4).Align(Align.Center).Width(Size.Full())
@@ -61,14 +74,19 @@ public class BuilderView : ViewBase
                                   count,
                                   DateTime.Now.ToString("yyyy-MM-dd"),
                                   "New",
-                                  canvasBlocks.Value
+                                  canvasBlocks.Value,
+                                  operators.Value
                               );
                               _cohorts.Set([.. _cohorts.Value, newCohort]);
                               client.Toast("Cohort saved!");
                               _navigateTo("library");
                             })
                         | new Button("Export").Variant(ButtonVariant.Outline).Icon(Icons.Download).Width(Size.Full())
-                            .HandleClick(_ => client.Toast("Exporting cohort...")))
+                            .HandleClick(_ =>
+                            {
+                              exportState.TargetName.Set(cohortName.Value);
+                              exportState.Show.Set(true);
+                            }))
                     | (Layout.Horizontal().Gap(2).Width(Size.Full())
                         | new Button("Schedule").Variant(ButtonVariant.Outline).Icon(Icons.Clock).Width(Size.Full())
                             .HandleClick(_ => client.Toast("Schedule dialog coming soon"))
@@ -88,17 +106,78 @@ public class BuilderView : ViewBase
             .Where(b => !canvasBlocks.Value.Contains(b.Id))
             .Select(b =>
                 (object)new Card(
-                    Layout.Horizontal().Gap(3).Align(Align.Center)
+                    Layout.Horizontal().Gap(2).Align(Align.Center)
                         | (Layout.Vertical()
                             | Text.P(b.Label).Small())
                         | new Spacer()
                         | new Button("+")
                             .Variant(ButtonVariant.Ghost)
                             .HandleClick(_ =>
-                                canvasBlocks.Set(canvasBlocks.Value.Append(b.Id).ToArray()))
+                            {
+                              if (canvasBlocks.Value.Length >= 1)
+                              {
+                                operators.Set([.. operators.Value, "AND"]);
+                              }
+                              canvasBlocks.Set([.. canvasBlocks.Value, b.Id]);
+                            })
                 ).WithTooltip(b.Description));
 
     // --- Canvas card ---
+    IEnumerable<object> canvasItems = canvasBlocks.Value.Select((blockId, idx) =>
+    {
+      var def = AvailableBlocks.FirstOrDefault(b => b.Id == blockId)
+                            ?? new BlockDef(blockId, blockId, "", Icons.Box, "EVENT");
+      var capturedIdx = idx;
+
+      var blockCard = (object)(Layout.Horizontal().Width(Size.Units(100)).Align(Align.Center)
+        | new Card(
+              Layout.Horizontal().Gap(2).Align(Align.Center).Padding(2)
+                  | (Layout.Vertical().Gap(0)
+                      | Text.P(def.Label).Bold().Small()
+                      | Text.P(def.Category).Small().Muted().Color(Colors.Purple))
+                  | new Spacer()
+                  | new Button().Icon(Icons.X).Variant(ButtonVariant.Ghost)
+                      .HandleClick(_ =>
+                      {
+                        if (capturedIdx > 0 && operators.Value.Length > capturedIdx - 1)
+                        {
+                          operators.Set(operators.Value.Where((_, i) => i != capturedIdx - 1).ToArray());
+                        }
+                        else if (operators.Value.Length > 0)
+                        {
+                          operators.Set(operators.Value.Skip(1).ToArray());
+                        }
+                        canvasBlocks.Set(canvasBlocks.Value.Where((_, i) => i != capturedIdx).ToArray());
+                      })));
+
+      if (idx > 0 && idx - 1 < operators.Value.Length)
+      {
+        var opIdx = idx - 1;
+        var op = operators.Value[opIdx];
+        var opSelector = (object)(Layout.Horizontal().Gap(2).Align(Align.Center)
+            | new Button("AND")
+                .Variant(op == "AND" ? ButtonVariant.Primary : ButtonVariant.Outline)
+                .HandleClick(_ =>
+                {
+                  var newOps = operators.Value.ToArray();
+                  newOps[opIdx] = "AND";
+                  operators.Set(newOps);
+                })
+            | new Button("OR")
+                .Variant(op == "OR" ? ButtonVariant.Primary : ButtonVariant.Outline)
+                .HandleClick(_ =>
+                {
+                  var newOps = operators.Value.ToArray();
+                  newOps[opIdx] = "OR";
+                  operators.Set(newOps);
+                }));
+
+        return new object[] { opSelector, blockCard };
+      }
+
+      return [blockCard];
+    }).SelectMany(x => (object[])x);
+
     object canvasInner;
     if (canvasBlocks.Value.Length == 0)
     {
@@ -110,33 +189,17 @@ public class BuilderView : ViewBase
     }
     else
     {
-      canvasInner = Layout.Vertical().Gap(3).Align(Align.Center).Width(Size.Full())
-          | canvasBlocks.Value.Select((blockId, idx) =>
-          {
-            var def = AvailableBlocks.FirstOrDefault(b => b.Id == blockId)
-                                  ?? new BlockDef(blockId, blockId, "", Icons.Box, "EVENT");
-            var capturedIdx = idx;
-            return (object)(Layout.Horizontal().Width(Size.Full()).Align(Align.Center)
-              | new Card(
-                    Layout.Horizontal().Gap(4).Align(Align.Center).Padding(4)
-                        | new Icon(def.Icon).Color(Colors.Blue)
-                        | (Layout.Vertical()
-                            | Text.P(def.Label).Bold()
-                            | Text.P(def.Category).Color(Colors.Purple).Small())
-                        | new Spacer()
-                        | new Button("✕")
-                            .Variant(ButtonVariant.Ghost)
-                            .HandleClick(_ =>
-                                canvasBlocks.Set(
-                                    canvasBlocks.Value.Where((_, i) => i != capturedIdx).ToArray()))
-                ).Width(Size.Units(122)));
-          });
+      canvasInner = Layout.Vertical().Gap(4).Align(Align.Center).Width(Size.Half())
+          | canvasItems;
     }
 
     var canvasCard = new Card(
-        Layout.Vertical().Height(Size.Units(96))
+        Layout.Center().Height(Size.Units(126))
             | canvasInner
     );
+
+    // --- Export Dialog ---
+    var exportDialog = ExportDialog.Build(exportState, client);
 
     // --- Cohort Insights ---
     object? cohortInsights = null;
@@ -159,32 +222,36 @@ public class BuilderView : ViewBase
         };
 
       cohortInsights = Layout.Vertical().Gap(4)
-          | (Layout.Vertical().Gap(1)
-              | Text.H3("Cohort Insights")
-              | Text.P("An overview of the users in your defined cohort.").Muted())
-          | (Layout.Grid().Columns(2).Gap(4)
-              | new Card(
-                  Layout.Vertical().Gap(2)
-                      | Text.P("Demographic Breakdown").Bold()
-                      | demoData.ToPieChart(e => e.Region, e => (double)e.Sum(f => f.Value)))
-              | new Card(
-                  Layout.Vertical().Gap(2)
-                      | Text.P("Top Events").Bold()
-                      | eventsData.ToBarChart()
-                          .Dimension("Event", e => e.Event)
-                          .Measure("Count", e => (double)e.Sum(f => f.Count))));
+              | (Layout.Vertical().Gap(1)
+                  | Text.H3("Cohort Insights")
+                  | Text.P("An overview of the users in your defined cohort.").Muted())
+              | (Layout.Grid().Columns(2).Gap(4)
+                  | new Card(
+                      Layout.Vertical().Gap(2)
+                          | Text.P("Demographic Breakdown").Bold()
+                          | demoData.ToPieChart(e => e.Region, e => (double)e.Sum(f => f.Value)))
+                  | new Card(
+                      Layout.Vertical().Gap(2)
+                          | Text.P("Top Events").Bold()
+                          | eventsData.ToBarChart()
+                              .Dimension("Event", e => e.Event)
+                              .Measure("Count", e => (double)e.Sum(f => f.Count))));
     }
 
     // --- Main content: header + canvas + insights ---
-    var mainContent = Layout.Vertical().Gap(8)
+    var mainContent = Layout.Vertical().Gap(2).Width(Size.Full())
         | headerCard
         | canvasCard
         | cohortInsights;
 
-    return new SidebarLayout(
+    var layout = new SidebarLayout(
         mainContent: mainContent,
         sidebarContent: sidebarContent,
         sidebarHeader: Layout.Vertical().Gap(2) | Text.Lead("Block")
     );
+
+    return (Layout.Vertical()
+        | layout
+        | exportDialog);
   }
 }

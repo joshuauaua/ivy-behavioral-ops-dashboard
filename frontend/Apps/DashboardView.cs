@@ -4,6 +4,8 @@ public class DashboardView : ViewBase
 {
   public override object? Build()
   {
+    var selectedTab = UseState(0);
+
     // --- Stat data ---
     int totalCohorts = 12;
     int totalUsers = 45820;
@@ -86,12 +88,17 @@ public class DashboardView : ViewBase
                 .Header(p => p.Cohort, "Cohort Name")
     );
 
-    return Layout.Vertical().Gap(6).Padding(6)
-        | (Layout.Vertical().Gap(1)
-            | Text.H2("Overview Dashboard")
-            | Text.P("Get a high-level overview of your cohort analytics.").Muted())
-        | statsRow
-        | chartsRow
-        | activityFeed;
+    var content = selectedTab.Value == 0
+        ? (object)(Layout.Vertical().Gap(6)
+            | statsRow
+            | chartsRow
+            | activityFeed)
+        : Layout.Vertical().Align(Align.Center).Padding(20)
+            | Text.H3($"Content for {selectedTab.Value} tab").Muted();
+
+    return Layout.Vertical().Gap(0)
+        | new DashboardHeader(selectedTab, () => { /* Handle click */ })
+        | Layout.Vertical().Gap(6).Padding(6)
+            | content;
   }
 }

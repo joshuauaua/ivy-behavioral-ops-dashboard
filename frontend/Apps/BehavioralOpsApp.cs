@@ -8,9 +8,9 @@ public class BehavioralOpsApp : ViewBase
     var activePage = UseState("builder");
     var cohorts = UseState(new Cohort[]
     {
-        new("Active US Users",      3, 8919, "2025-08-20", "High-Value", Array.Empty<string>()),
-        new("Recent Signups (EU)",  1, 8380, "2025-08-21", "New", Array.Empty<string>()),
-        new("New Prospect Cohort",  1, 6700, "2025-08-22", "New", Array.Empty<string>()),
+        new("Active US Users",      3, 8919, "2025-08-20", "High-Value", Array.Empty<string>(), Array.Empty<string>()),
+        new("Recent Signups (EU)",  1, 8380, "2025-08-21", "New", Array.Empty<string>(), Array.Empty<string>()),
+        new("New Prospect Cohort",  1, 6700, "2025-08-22", "New", Array.Empty<string>(), Array.Empty<string>()),
     });
 
     object GetPageContent() => activePage.Value switch

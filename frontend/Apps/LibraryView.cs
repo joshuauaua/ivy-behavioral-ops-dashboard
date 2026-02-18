@@ -16,6 +16,16 @@ public class LibraryView : ViewBase
     var search = UseState("");
     var activeFilter = UseState("All");
     var client = UseService<IClientProvider>();
+    var exportState = new ExportDialog.State(
+        UseState(false),
+        UseState("CSV"),
+        UseState(true),
+        UseState(true),
+        UseState(true),
+        UseState(false),
+        UseState(false),
+        UseState("")
+    );
 
     string[] filters = { "All", "New", "High-Value", "Archived", "Marketing" };
 
@@ -75,13 +85,18 @@ public class LibraryView : ViewBase
                           | new Button("Open").Variant(ButtonVariant.Outline)
                               .HandleClick(_ => _navigateTo("builder"))
                           | new Button("Export").Variant(ButtonVariant.Outline)
-                              .HandleClick(_ => client.Toast($"Exporting {c.Name}...")))
+                              .HandleClick(_ =>
+                              {
+                                exportState.TargetName.Set(c.Name);
+                                exportState.Show.Set(true);
+                              }))
               ));
     }
 
     return Layout.Vertical().Gap(6).Padding(6)
         | topBar
         | searchAndFilter
-        | grid;
+        | grid
+        | ExportDialog.Build(exportState, client);
   }
 }

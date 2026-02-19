@@ -97,7 +97,6 @@ public class DashboardView : ViewBase
             | Text.H3($"Content for {selectedTab.Value} tab").Muted();
 
     return Layout.Vertical().Gap(0)
-        | new DashboardHeader(selectedTab, () => { /* Handle click */ })
         | Layout.Vertical().Gap(6).Padding(6)
             | content;
   }

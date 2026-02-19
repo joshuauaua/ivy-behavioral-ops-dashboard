@@ -29,7 +29,7 @@ public class BuilderView : ViewBase
   public override object? Build()
   {
     var canvasBlocks = UseState(Array.Empty<string>());
-    var cohortName = UseState("New Prospect Cohort");
+    var cohortName = UseState("New Cohort");
     var isEditingName = UseState(false);
     var client = UseService<IClientProvider>();
 
@@ -45,6 +45,7 @@ public class BuilderView : ViewBase
         UseState("")
     );
     var operators = UseState(Array.Empty<string>());
+    var categoryFilter = UseState("All");
 
     // Realtime count (number of blocks added as a proxy)
     int count = canvasBlocks.Value.Length * 1247; // simulated count
@@ -65,7 +66,7 @@ public class BuilderView : ViewBase
             | (Layout.Horizontal().Gap(4).Align(Align.Center).Width(Size.Full())
                 | (Layout.Vertical().Gap(2)
                     | (Layout.Horizontal().Gap(2).Width(Size.Full())
-                        | new Button("Save Cohort").Variant(ButtonVariant.Primary).Icon(Icons.Save).Width(Size.Full())
+                        | new Button("Save Cohort").Variant(ButtonVariant.Primary).Icon(Icons.Save).Width(Size.Units(60))
                             .HandleClick(_ =>
                             {
                               var newCohort = new Cohort(
@@ -81,16 +82,16 @@ public class BuilderView : ViewBase
                               client.Toast("Cohort saved!");
                               _navigateTo("library");
                             })
-                        | new Button("Export").Variant(ButtonVariant.Outline).Icon(Icons.Download).Width(Size.Full())
+                        | new Button("Export").Variant(ButtonVariant.Outline).Icon(Icons.Download).Width(Size.Units(60))
                             .HandleClick(_ =>
                             {
                               exportState.TargetName.Set(cohortName.Value);
                               exportState.Show.Set(true);
                             }))
                     | (Layout.Horizontal().Gap(2).Width(Size.Full())
-                        | new Button("Schedule").Variant(ButtonVariant.Outline).Icon(Icons.Clock).Width(Size.Full())
+                        | new Button("Schedule").Variant(ButtonVariant.Outline).Icon(Icons.Clock).Width(Size.Units(60))
                             .HandleClick(_ => client.Toast("Schedule dialog coming soon"))
-                        | new Button("Clear").Variant(ButtonVariant.Destructive).Icon(Icons.Trash2).Width(Size.Full())
+                        | new Button("Clear").Variant(ButtonVariant.Destructive).Icon(Icons.Trash2).Width(Size.Units(60))
                             .HandleClick(_ => canvasBlocks.Set(Array.Empty<string>()))))
                 | new Card(
                     Layout.Vertical().Gap(1).Align(Align.Center)
@@ -103,12 +104,13 @@ public class BuilderView : ViewBase
     // --- Sidebar block palette ---
     var sidebarContent = Layout.Vertical().Gap(2)
         | AvailableBlocks
-            .Where(b => !canvasBlocks.Value.Contains(b.Id))
+            .Where(b => (categoryFilter.Value == "All" || b.Category == categoryFilter.Value) && !canvasBlocks.Value.Contains(b.Id))
             .Select(b =>
                 (object)new Card(
                     Layout.Horizontal().Gap(2).Align(Align.Center)
-                        | (Layout.Vertical()
-                            | Text.P(b.Label).Small())
+                        | (Layout.Vertical().Gap(0)
+                            | Text.P(b.Label).Small()
+                            | Text.P(b.Category).Small().Muted().Color(Colors.Purple))
                         | new Spacer()
                         | new Button("+")
                             .Variant(ButtonVariant.Ghost)
@@ -247,7 +249,9 @@ public class BuilderView : ViewBase
     var layout = new SidebarLayout(
         mainContent: mainContent,
         sidebarContent: sidebarContent,
-        sidebarHeader: Layout.Vertical().Gap(2) | Text.Lead("Block")
+        sidebarHeader: Layout.Vertical().Gap(2)
+            | Text.Lead("Block")
+            | new SelectInput<string>(categoryFilter, new[] { "All", "EVENT", "FILTER" })
     );
 
     return (Layout.Vertical()

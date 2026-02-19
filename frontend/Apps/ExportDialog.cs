@@ -15,13 +15,13 @@ public class ExportDialog
 
   public static object Build(State state, IClientProvider client)
   {
-    return (Layout.Vertical().Gap(6).Padding(12).Width(Size.Units(100)).Align(Align.Center)
-            | (Layout.Vertical().Gap(1).Align(Align.Center)
+    return (Layout.Vertical().Gap(6).Padding(4).Width(Size.Units(80)).Align(Align.Center)
+            | (Layout.Vertical().Gap(2).Align(Align.Left)
                 | Text.H3($"Export {state.TargetName.Value}")
-                | Text.P("Select columns and file type for your export.").Muted())
+                | Text.P("Select columns and file type.").Muted())
             | (Layout.Vertical().Gap(4).Align(Align.Center)
                 | Text.P("Columns").Bold()
-                | (Layout.Grid().Columns(2).Gap(4)
+                | (Layout.Grid().Columns(2).Gap(6)
                     | (Layout.Horizontal().Gap(2).Align(Align.Left) | new BoolInput(state.UserId) | Text.P("user_id"))
                     | (Layout.Horizontal().Gap(2).Align(Align.Left) | new BoolInput(state.Email) | Text.P("email"))
                     | (Layout.Horizontal().Gap(2).Align(Align.Left) | new BoolInput(state.SignupDate) | Text.P("signup_date"))

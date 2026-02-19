@@ -5,7 +5,7 @@ public class BehavioralOpsApp : ViewBase
 {
   public override object? Build()
   {
-    var activePage = UseState("builder");
+    var selectedTabIndex = UseState(0);
     var cohorts = UseState(new Cohort[]
     {
         new("Active US Users",      3, 8919, "2025-08-20", "High-Value", Array.Empty<string>(), Array.Empty<string>()),
@@ -13,32 +13,28 @@ public class BehavioralOpsApp : ViewBase
         new("New Prospect Cohort",  1, 6700, "2025-08-22", "New", Array.Empty<string>(), Array.Empty<string>()),
     });
 
-    object GetPageContent() => activePage.Value switch
+    string GetActivePage() => selectedTabIndex.Value switch
     {
-      "builder" => new BuilderView(cohorts, page => activePage.Value = page),
-      "dashboard" => new DashboardView(),
-      "library" => new LibraryView(cohorts, navigateTo: page => activePage.Value = page),
-      "testing" => new TestingView(),
-      _ => new BuilderView(cohorts, page => activePage.Value = page)
+      0 => "dashboard",
+      1 => "library",
+      2 => "testing",
+      4 => "builder",
+      _ => "dashboard"
     };
 
-    var header = new Card(
-        Layout.Horizontal().Gap(3).Align(Align.Center).Width(Size.Full())
-            | Text.H4("Behavioral Ops")
-            | new Spacer()
-            | new Button("Builder")
-                .Variant(activePage.Value == "builder" ? ButtonVariant.Primary : ButtonVariant.Ghost)
-                .HandleClick(_ => activePage.Value = "builder")
-            | new Button("Dashboard")
-                .Variant(activePage.Value == "dashboard" ? ButtonVariant.Primary : ButtonVariant.Ghost)
-                .HandleClick(_ => activePage.Value = "dashboard")
-            | new Button("Library")
-                .Variant(activePage.Value == "library" ? ButtonVariant.Primary : ButtonVariant.Ghost)
-                .HandleClick(_ => activePage.Value = "library")
-            | new Button("Testing")
-                .Variant(activePage.Value == "testing" ? ButtonVariant.Primary : ButtonVariant.Ghost)
-                .HandleClick(_ => activePage.Value = "testing")
-    );
+    object GetPageContent() => GetActivePage() switch
+    {
+      "dashboard" => new DashboardView(),
+      "library" => new LibraryView(cohorts, _ => selectedTabIndex.Set(4)), // Navigate to Templates (Builder)
+      "builder" => new BuilderView(cohorts, page =>
+      {
+        if (page == "library") selectedTabIndex.Set(1);
+      }),
+      "testing" => new TestingView(),
+      _ => new DashboardView()
+    };
+
+    var header = new DashboardHeader(selectedTabIndex, () => { /* Global Import action */ });
 
     return new HeaderLayout(header, GetPageContent());
   }

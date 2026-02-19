@@ -26,7 +26,9 @@ public class LibraryView : ViewBase
         UseState(true),
         UseState(false),
         UseState(false),
-        UseState("")
+        UseState(""),
+        UseState(Array.Empty<string>()),
+        UseState(Array.Empty<string>())
     );
 
     string[] filters = { "All", "New", "High-Value", "Archived", "Marketing" };
@@ -90,6 +92,8 @@ public class LibraryView : ViewBase
                               .HandleClick(_ =>
                               {
                                 exportState.TargetName.Set(c.Name);
+                                exportState.Blocks.Set(c.Blocks);
+                                exportState.Operators.Set(c.Operators);
                                 exportState.Show.Set(true);
                               }))
               ));

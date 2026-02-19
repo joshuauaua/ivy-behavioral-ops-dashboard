@@ -36,3 +36,4 @@ public record DistributionItem(string range, int count);
 public record CountResponse(int count);
 public record TrendItem(string Month, int Cohorts);
 public record ActivityItem(string Cohort, string Action, string Timestamp, string User);
+public record CreateCohortRequest(string Name, string? Definition, string? AdminUser);

@@ -54,7 +54,9 @@ public class BuilderView : ViewBase
         UseState(true),
         UseState(false),
         UseState(false),
-        UseState("")
+        UseState(""),
+        UseState(Array.Empty<string>()),
+        UseState(Array.Empty<string>())
     );
 
     UseEffect(async () =>
@@ -92,25 +94,53 @@ public class BuilderView : ViewBase
                 | (Layout.Vertical().Gap(2)
                     | (Layout.Horizontal().Gap(2).Width(Size.Full())
                         | new Button("Save Cohort").Variant(ButtonVariant.Primary).Icon(Icons.Save).Width(Size.Units(60))
-                            .HandleClick(_ =>
+                            .HandleClick(async _ =>
                             {
-                              var newCohort = new Cohort(
-                                  cohortName.Value,
-                                  1,
-                                  count,
-                                  DateTime.Now.ToString("yyyy-MM-dd"),
-                                  "New",
-                                  canvasBlocks.Value,
-                                  operators.Value
-                              );
-                              _cohorts.Set([.. _cohorts.Value, newCohort]);
-                              client.Toast("Cohort saved!");
-                              _navigateTo("library");
+                              try
+                              {
+                                using var http = new HttpClient();
+                                var request = new CreateCohortRequest(
+                                    cohortName.Value,
+                                    JsonSerializer.Serialize(canvasBlocks.Value),
+                                    "admin_user" // Or fetch actual user if available
+                                );
+
+                                var response = await http.PostAsJsonAsync("http://localhost:5152/api/cohorts", request);
+                                if (response.IsSuccessStatusCode)
+                                {
+                                  var created = await response.Content.ReadFromJsonAsync<BackendCohort>();
+                                  if (created != null)
+                                  {
+                                    var mapped = new Cohort(
+                                        created.name,
+                                        1,
+                                        count,
+                                        created.createdAt.ToString("yyyy-MM-dd"),
+                                        "New",
+                                        canvasBlocks.Value,
+                                        operators.Value
+                                    );
+                                    _cohorts.Set([.. _cohorts.Value, mapped]);
+                                    client.Toast("Cohort saved and logged!");
+                                    _navigateTo("library");
+                                  }
+                                }
+                                else
+                                {
+                                  client.Toast("Failed to save cohort to server.", variant: AlertVariant.Destructive);
+                                }
+                              }
+                              catch (Exception ex)
+                              {
+                                client.Toast($"Error: {ex.Message}", variant: AlertVariant.Destructive);
+                              }
                             })
                         | new Button("Export").Variant(ButtonVariant.Outline).Icon(Icons.Download).Width(Size.Units(60))
                             .HandleClick(_ =>
                             {
                               exportState.TargetName.Set(cohortName.Value);
+                              exportState.Blocks.Set(canvasBlocks.Value);
+                              exportState.Operators.Set(operators.Value);
                               exportState.Show.Set(true);
                             }))
                     | (Layout.Horizontal().Gap(2).Width(Size.Full())

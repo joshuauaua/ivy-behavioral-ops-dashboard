@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using BehavioralOps.Backend.Models;
+using System.Text;
+using System.Globalization;
+using System.IO;
 
 namespace BehavioralOps.Backend.Controllers;
 
@@ -139,6 +142,76 @@ public class AnalyticsController : ControllerBase
         .ToListAsync();
 
     return Ok(logs);
+  }
+
+  [HttpGet("export")]
+  public async Task<IActionResult> Export([FromQuery] string blocks, [FromQuery] string operators, [FromQuery] string fileType, [FromQuery] string columns)
+  {
+    var blockList = JsonSerializer.Deserialize<string[]>(blocks) ?? Array.Empty<string>();
+    var operatorList = JsonSerializer.Deserialize<string[]>(operators) ?? Array.Empty<string>();
+    var selectedColumns = JsonSerializer.Deserialize<string[]>(columns) ?? Array.Empty<string>();
+
+    var users = await _db.Users.ToListAsync();
+    var members = new List<Dictionary<string, object>>();
+
+    foreach (var user in users)
+    {
+      if (EvaluateUser(user, blockList, operatorList))
+      {
+        var props = JsonSerializer.Deserialize<Dictionary<string, object>>(user.Properties) ?? new();
+        var row = new Dictionary<string, object>();
+
+        if (selectedColumns.Contains("user_id")) row["user_id"] = user.ExternalId;
+
+        foreach (var col in selectedColumns)
+        {
+          if (col == "user_id") continue;
+          if (props.TryGetValue(col, out var val))
+          {
+            row[col] = val?.ToString() ?? "";
+          }
+          else
+          {
+            row[col] = "";
+          }
+        }
+        members.Add(row);
+      }
+    }
+
+    if (fileType.ToUpper() == "JSON")
+    {
+      var json = JsonSerializer.Serialize(members, new JsonSerializerOptions { WriteIndented = true });
+      return File(Encoding.UTF8.GetBytes(json), "application/json", "export.json");
+    }
+    else
+    {
+      using var ms = new MemoryStream();
+      using (var writer = new StreamWriter(ms, Encoding.UTF8))
+      using (var csv = new CsvHelper.CsvWriter(writer, CultureInfo.InvariantCulture))
+      {
+        if (members.Any())
+        {
+          // Write header
+          foreach (var key in members[0].Keys)
+          {
+            csv.WriteField(key);
+          }
+          csv.NextRecord();
+
+          // Write data
+          foreach (var row in members)
+          {
+            foreach (var val in row.Values)
+            {
+              csv.WriteField(val);
+            }
+            csv.NextRecord();
+          }
+        }
+      }
+      return File(ms.ToArray(), "text/csv", "export.csv");
+    }
   }
 
   private async Task<int> CalculateCohortSize(string definition)

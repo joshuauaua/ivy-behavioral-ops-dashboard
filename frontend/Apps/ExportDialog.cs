@@ -10,7 +10,9 @@ public class ExportDialog
       IState<bool> SignupDate,
       IState<bool> LastSeen,
       IState<bool> Country,
-      IState<string> TargetName
+      IState<string> TargetName,
+      IState<string[]> Blocks,
+      IState<string[]> Operators
   );
 
   public static object Build(State state, IClientProvider client)
@@ -37,6 +39,20 @@ public class ExportDialog
             | new Button("Download").Variant(ButtonVariant.Primary).Icon(Icons.Download).Width(Size.Full())
                 .HandleClick(_ =>
                 {
+                  var selectedCols = new List<string>();
+                  if (state.UserId.Value) selectedCols.Add("user_id");
+                  if (state.Email.Value) selectedCols.Add("email");
+                  if (state.SignupDate.Value) selectedCols.Add("signup_date");
+                  if (state.LastSeen.Value) selectedCols.Add("last_seen");
+                  if (state.Country.Value) selectedCols.Add("country");
+
+                  var blocksJson = System.Text.Json.JsonSerializer.Serialize(state.Blocks.Value);
+                  var opsJson = System.Text.Json.JsonSerializer.Serialize(state.Operators.Value);
+                  var colsJson = System.Text.Json.JsonSerializer.Serialize(selectedCols);
+
+                  var url = $"http://localhost:5152/api/analytics/export?blocks={Uri.EscapeDataString(blocksJson)}&operators={Uri.EscapeDataString(opsJson)}&fileType={state.FileType.Value}&columns={Uri.EscapeDataString(colsJson)}";
+
+                  client.OpenUrl(url);
                   client.Toast($"Downloading {state.FileType.Value} export for {state.TargetName.Value}...");
                   state.Show.Set(false);
                 }))

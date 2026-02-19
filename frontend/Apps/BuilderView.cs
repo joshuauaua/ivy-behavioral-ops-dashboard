@@ -6,11 +6,13 @@ using System.Net.Http;
 public class BuilderView : ViewBase
 {
   readonly IState<Cohort[]> _cohorts;
+  readonly IState<Cohort?> _selectedCohort;
   readonly Action<string> _navigateTo;
 
-  public BuilderView(IState<Cohort[]> cohorts, Action<string> navigateTo)
+  public BuilderView(IState<Cohort[]> cohorts, IState<Cohort?> selectedCohort, Action<string> navigateTo)
   {
     _cohorts = cohorts;
+    _selectedCohort = selectedCohort;
     _navigateTo = navigateTo;
   }
 
@@ -31,9 +33,16 @@ public class BuilderView : ViewBase
 
   public override object? Build()
   {
-    var canvasBlocks = UseState(Array.Empty<string>());
-    var cohortName = UseState("New Cohort");
+    var initialBlocks = _selectedCohort.Value?.Blocks ?? Array.Empty<string>();
+    var initialName = _selectedCohort.Value?.Name ?? "New Cohort";
+    var initialOps = _selectedCohort.Value?.Operators ?? Array.Empty<string>();
+
+    var canvasBlocks = UseState(initialBlocks);
+    var cohortName = UseState(initialName);
     var isEditingName = UseState(false);
+    var operators = UseState(initialOps);
+    var categoryFilter = UseState("All");
+    var realtimeCount = UseState(0);
     var client = UseService<IClientProvider>();
 
     // Export Dialog State
@@ -47,16 +56,13 @@ public class BuilderView : ViewBase
         UseState(false),
         UseState("")
     );
-    var operators = UseState(Array.Empty<string>());
-    var categoryFilter = UseState("All");
-    var realtimeCount = UseState(0);
 
     UseEffect(async () =>
     {
       try
       {
         using var http = new HttpClient();
-        var response = await http.PostAsJsonAsync("http://localhost:5152/api/analytics/count", canvasBlocks.Value);
+        var response = await http.PostAsJsonAsync("http://localhost:5152/api/analytics/count", new { Blocks = canvasBlocks.Value, Operators = operators.Value });
         if (response.IsSuccessStatusCode)
         {
           var result = await response.Content.ReadFromJsonAsync<CountResponse>();
@@ -64,7 +70,7 @@ public class BuilderView : ViewBase
         }
       }
       catch { }
-    }, [canvasBlocks]);
+    }, [canvasBlocks, operators]);
 
     // Proxy count for saving logic, but UI will use realtimeCount
     int count = realtimeCount.Value;
@@ -277,6 +283,4 @@ public class BuilderView : ViewBase
         | layout
         | exportDialog);
   }
-
-  record CountResponse(int count);
 }

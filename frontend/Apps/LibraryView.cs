@@ -3,11 +3,13 @@ namespace Frontend.Apps;
 public class LibraryView : ViewBase
 {
   readonly IState<Cohort[]> _cohorts;
+  readonly IState<Cohort?> _selectedCohort;
   readonly Action<string> _navigateTo;
 
-  public LibraryView(IState<Cohort[]> cohorts, Action<string> navigateTo)
+  public LibraryView(IState<Cohort[]> cohorts, IState<Cohort?> selectedCohort, Action<string> navigateTo)
   {
     _cohorts = cohorts;
+    _selectedCohort = selectedCohort;
     _navigateTo = navigateTo;
   }
 
@@ -79,7 +81,11 @@ public class LibraryView : ViewBase
                               | Text.P($"Refreshed: {c.RefreshedDate}").Muted().Small()))
                       | (Layout.Horizontal().Gap(2)
                           | new Button("Open").Variant(ButtonVariant.Outline)
-                              .HandleClick(_ => _navigateTo("builder"))
+                              .HandleClick(_ =>
+                              {
+                                _selectedCohort.Set(c);
+                                _navigateTo("builder");
+                              })
                           | new Button("Export").Variant(ButtonVariant.Outline)
                               .HandleClick(_ =>
                               {

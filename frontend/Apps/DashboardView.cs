@@ -1,5 +1,8 @@
 namespace Frontend.Apps;
 
+using System.Net.Http.Json;
+using System.Net.Http;
+
 public class DashboardView : ViewBase
 {
   public override object? Build()
@@ -7,38 +10,37 @@ public class DashboardView : ViewBase
     var selectedTab = UseState(0);
 
     // --- Stat data ---
-    int totalCohorts = 12;
-    int totalUsers = 45820;
-    double avgSize = 3818.33;
+    var totalCohorts = UseState(0);
+    var totalUsers = UseState(0);
+    var avgSize = UseState(0.0);
+    var sizeDistData = UseState(Array.Empty<DistributionItem>());
+    var trendData = UseState(Array.Empty<TrendItem>());
+    var activityData = UseState(Array.Empty<ActivityItem>());
 
-    // --- Bar chart data: Cohort Size Distribution ---
-    var sizeDistData = new[]
+    UseEffect(async () =>
     {
-            new { Range = "0-1k",   Count = 3 },
-            new { Range = "1k-5k",  Count = 5 },
-            new { Range = "5k-10k", Count = 2 },
-            new { Range = "10k+",   Count = 2 },
-        };
+      try
+      {
+        using var http = new HttpClient();
+        var stats = await http.GetFromJsonAsync<StatsResponse>("http://localhost:5152/api/analytics/stats");
+        if (stats != null)
+        {
+          totalCohorts.Set(stats.totalCohorts);
+          totalUsers.Set(stats.totalUsers);
+          avgSize.Set(stats.avgSize);
+        }
 
-    // --- Line chart data: Cohort Creation Trend ---
-    var trendData = new[]
-    {
-            new { Month = "Jan", Cohorts = 2 },
-            new { Month = "Feb", Cohorts = 1 },
-            new { Month = "Mar", Cohorts = 3 },
-            new { Month = "Apr", Cohorts = 4 },
-            new { Month = "May", Cohorts = 2 },
-        };
+        var dist = await http.GetFromJsonAsync<DistributionItem[]>("http://localhost:5152/api/analytics/distribution");
+        if (dist != null) sizeDistData.Set(dist);
 
-    // --- Activity feed data ---
-    var activitiesData = new[]
-    {
-            new { Cohort = "New Prospect Cohort", Action = "Updated",   Timestamp = "2 mins ago",  User = "joshuang" },
-            new { Cohort = "Active US Users",     Action = "Exported",  Timestamp = "1 hour ago",  User = "joshuang" },
-            new { Cohort = "Recent Signups (EU)", Action = "Created",   Timestamp = "3 hours ago", User = "admin" },
-            new { Cohort = "New Prospect Cohort", Action = "Scheduled", Timestamp = "5 hours ago", User = "joshuang" },
-            new { Cohort = "All Customers",       Action = "Created",   Timestamp = "Yesterday",   User = "system" },
-        };
+        var trend = await http.GetFromJsonAsync<TrendItem[]>("http://localhost:5152/api/analytics/trend");
+        if (trend != null) trendData.Set(trend);
+
+        var activity = await http.GetFromJsonAsync<ActivityItem[]>("http://localhost:5152/api/analytics/activity");
+        if (activity != null) activityData.Set(activity);
+      }
+      catch { }
+    }, []);
 
     // --- Stat cards ---
     object StatCard(Icons icon, string label, string value) =>
@@ -51,9 +53,9 @@ public class DashboardView : ViewBase
         );
 
     var statsRow = Layout.Grid().Columns(3).Gap(4)
-        | StatCard(Icons.LayoutDashboard, "Total Cohorts", totalCohorts.ToString())
-        | StatCard(Icons.Users, "Total Users", totalUsers.ToString("N0"))
-        | StatCard(Icons.ChartBar, "Avg. Cohort Size", avgSize.ToString("N2"));
+        | StatCard(Icons.LayoutDashboard, "Total Cohorts", totalCohorts.Value.ToString())
+        | StatCard(Icons.Users, "Total Users", ((int)totalUsers.Value).ToString("N0"))
+        | StatCard(Icons.ChartBar, "Avg. Cohort Size", ((double)avgSize.Value).ToString("N2"));
 
     // --- Charts row ---
     var barChart = new Card(
@@ -62,15 +64,15 @@ public class DashboardView : ViewBase
                 | Text.P("Cohort Size Distribution")
                 | new Spacer()
                 | Text.P("Hover over a bar to see details").Muted().Small())
-            | sizeDistData.ToBarChart()
-                .Dimension("Range", e => e.Range)
-                .Measure("Count", e => e.Sum(f => f.Count))
+            | sizeDistData.Value.ToBarChart()
+                .Dimension("Range", e => e.range)
+                .Measure("Count", e => e.Sum(f => f.count))
     );
 
     var lineChart = new Card(
         Layout.Vertical().Gap(2)
             | Text.P("Cohort Creation Trend")
-            | trendData.ToLineChart()
+            | trendData.Value.ToLineChart()
                 .Dimension("Month", e => e.Month)
                 .Measure("Cohorts", e => e.Sum(f => f.Cohorts))
     );
@@ -83,9 +85,12 @@ public class DashboardView : ViewBase
     var activityFeed = new Card(
         Layout.Vertical().Gap(3)
             | Text.P("Recent Activity")
-            | activitiesData.ToTable()
+            | activityData.Value.ToTable()
                 .Width(Size.Full())
                 .Header(p => p.Cohort, "Cohort Name")
+                .Header(p => p.Action, "Action")
+                .Header(p => p.Timestamp, "Time")
+                .Header(p => p.User, "User")
     );
 
     var content = selectedTab.Value == 0

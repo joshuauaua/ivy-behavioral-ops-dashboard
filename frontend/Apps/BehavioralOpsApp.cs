@@ -11,7 +11,7 @@ public class BehavioralOpsApp : ViewBase
   {
     var selectedTabIndex = UseState(0);
     var cohorts = UseState(Array.Empty<Cohort>());
-    var selectedCohort = UseState((Cohort?)null);
+    var selectedCohort = UseState<Cohort?>((Cohort?)null);
 
     UseEffect(async () =>
     {

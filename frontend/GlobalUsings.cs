@@ -33,7 +33,7 @@ public record Cohort(string Name, int Version, int Members, string RefreshedDate
 public record BackendCohort(int id, string name, string definition, DateTime createdAt);
 public record StatsResponse(int totalUsers, int totalCohorts, double avgSize);
 public record DistributionItem(string range, int count);
-public record CountResponse(int count);
+public record CountResponse(int audienceCount, int activityCount);
 public record TrendItem(string Month, int Cohorts);
 public record ActivityItem(string Cohort, string Action, string Timestamp, string User);
 public record CreateCohortRequest(string Name, string? Definition, string? AdminUser);

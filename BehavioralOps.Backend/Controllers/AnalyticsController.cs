@@ -21,30 +21,69 @@ public class AnalyticsController : ControllerBase
   public async Task<IActionResult> GetCohortCount([FromBody] CountRequest request)
   {
     var users = await _db.Users.ToListAsync();
-    int count = 0;
+    var events = await _db.Events.ToListAsync();
+    int audienceCount = 0;
+    int activityCount = 0;
+
+    var filterBlocks = request.Blocks.Where(IsFilterBlock).ToArray();
+    // For audienceCount, we need to adjust operators to match the subset of blocks
+    // This is getting complex, so for audienceCount we'll just check if they match ALL the filter blocks for now
+    // Or we could try to filter the operator list too, but simpler is to just use a helper
 
     foreach (var user in users)
     {
-      if (EvaluateUser(user, request.Blocks, request.Operators))
+      var userEvents = events.Where(e => e.UserId == user.Id).ToList();
+      var props = JsonSerializer.Deserialize<Dictionary<string, object>>(user.Properties) ?? new();
+
+      // audienceCount: Only match user property filters
+      if (EvaluateFilterOnly(props, filterBlocks))
       {
-        count++;
+        audienceCount++;
+
+        // activityCount: Only if they match the full cohort definition AND were in the audience
+        if (EvaluateUser(user, userEvents, request.Blocks, request.Operators))
+        {
+          activityCount++;
+        }
       }
     }
 
-    return Ok(new { count });
+    return Ok(new CountResponse(audienceCount, activityCount));
   }
 
-  private bool EvaluateUser(User user, string[] blocks, string[] operators)
+  private bool IsFilterBlock(string blockId)
+  {
+    return blockId switch
+    {
+      "region_asia" or "region_eu" or "region_usa" or "high_value" or "churn_risk" => true,
+      _ => false
+    };
+  }
+
+  private bool EvaluateFilterOnly(Dictionary<string, object> props, string[] blocks)
+  {
+    if (blocks.Length == 0) return true; // Empty filter means everyone is the audience
+
+    // Simplification: Audience is everyone matching ALL current filter blocks (AND logic)
+    // regardless of the complex AND/OR operators used in the full builder
+    foreach (var block in blocks)
+    {
+      if (!MatchesBlock(props, new List<Event>(), block)) return false;
+    }
+    return true;
+  }
+
+  private bool EvaluateUser(User user, List<Event> userEvents, string[] blocks, string[] operators)
   {
     if (blocks == null || blocks.Length == 0) return false;
 
     var props = JsonSerializer.Deserialize<Dictionary<string, object>>(user.Properties) ?? new();
-    bool result = MatchesBlock(props, blocks[0]);
+    bool result = MatchesBlock(props, userEvents, blocks[0]);
 
     for (int i = 1; i < blocks.Length; i++)
     {
       string op = (operators != null && operators.Length >= i) ? operators[i - 1] : "AND";
-      bool matchesNext = MatchesBlock(props, blocks[i]);
+      bool matchesNext = MatchesBlock(props, userEvents, blocks[i]);
 
       if (op == "OR")
       {
@@ -59,7 +98,7 @@ public class AnalyticsController : ControllerBase
     return result;
   }
 
-  private bool MatchesBlock(Dictionary<string, object> props, string blockId)
+  private bool MatchesBlock(Dictionary<string, object> props, List<Event> userEvents, string blockId)
   {
     return blockId switch
     {
@@ -68,7 +107,11 @@ public class AnalyticsController : ControllerBase
       "region_usa" => props.TryGetValue("region", out var r) && r.ToString() == "USA",
       "high_value" => props.TryGetValue("high_value", out var hv) && hv is bool b && b,
       "churn_risk" => props.TryGetValue("churn_risk", out var cr) && cr is bool b && b,
-      _ => true // Events are simulated as true for now
+      "user_login" => userEvents.Any(e => e.Type == "user_login"),
+      "purchase" => userEvents.Any(e => e.Type == "purchase"),
+      "page_view" => userEvents.Any(e => e.Type == "page_view"),
+      "user_signup" => userEvents.Any(e => e.Type == "user_signup"),
+      _ => true
     };
   }
 
@@ -153,10 +196,12 @@ public class AnalyticsController : ControllerBase
 
     var users = await _db.Users.ToListAsync();
     var members = new List<Dictionary<string, object>>();
+    var events = await _db.Events.ToListAsync();
 
     foreach (var user in users)
     {
-      if (EvaluateUser(user, blockList, operatorList))
+      var userEvents = events.Where(e => e.UserId == user.Id).ToList();
+      if (EvaluateUser(user, userEvents, blockList, operatorList))
       {
         var props = JsonSerializer.Deserialize<Dictionary<string, object>>(user.Properties) ?? new();
         var row = new Dictionary<string, object>();
@@ -218,24 +263,18 @@ public class AnalyticsController : ControllerBase
   {
     var blockIds = JsonSerializer.Deserialize<List<string>>(definition) ?? new();
     var users = await _db.Users.ToListAsync();
+    var events = await _db.Events.ToListAsync();
     int count = 0;
 
     foreach (var user in users)
     {
+      var userEvents = events.Where(e => e.UserId == user.Id).ToList();
       var props = JsonSerializer.Deserialize<Dictionary<string, object>>(user.Properties) ?? new();
       bool matchesAll = true;
 
       foreach (var blockId in blockIds)
       {
-        bool matchesBlock = blockId switch
-        {
-          "region_asia" => props.TryGetValue("region", out var r) && r.ToString() == "Asia",
-          "region_eu" => props.TryGetValue("region", out var r) && r.ToString() == "EU",
-          "region_usa" => props.TryGetValue("region", out var r) && r.ToString() == "USA",
-          "high_value" => props.TryGetValue("high_value", out var hv) && hv is bool b && b,
-          "churn_risk" => props.TryGetValue("churn_risk", out var cr) && cr is bool b && b,
-          _ => true
-        };
+        bool matchesBlock = MatchesBlock(props, userEvents, blockId);
 
         if (!matchesBlock)
         {
@@ -261,3 +300,4 @@ public class AnalyticsController : ControllerBase
 }
 
 public record CountRequest(string[] Blocks, string[] Operators);
+public record CountResponse(int audienceCount, int activityCount);

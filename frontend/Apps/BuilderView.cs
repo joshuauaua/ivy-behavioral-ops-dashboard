@@ -2,6 +2,7 @@ namespace Frontend.Apps;
 
 using System.Net.Http.Json;
 using System.Net.Http;
+using System.Text.Json;
 
 public class BuilderView : ViewBase
 {
@@ -42,7 +43,8 @@ public class BuilderView : ViewBase
     var isEditingName = UseState(false);
     var operators = UseState(initialOps);
     var categoryFilter = UseState("All");
-    var realtimeCount = UseState(0);
+    var realtimeAudienceCount = UseState(0);
+    var realtimeActivityCount = UseState(0);
     var client = UseService<IClientProvider>();
 
     // Export Dialog State
@@ -68,14 +70,18 @@ public class BuilderView : ViewBase
         if (response.IsSuccessStatusCode)
         {
           var result = await response.Content.ReadFromJsonAsync<CountResponse>();
-          if (result != null) realtimeCount.Set(result.count);
+          if (result != null)
+          {
+            realtimeAudienceCount.Set(result.audienceCount);
+            realtimeActivityCount.Set(result.activityCount);
+          }
         }
       }
       catch { }
     }, [canvasBlocks, operators]);
 
-    // Proxy count for saving logic, but UI will use realtimeCount
-    int count = realtimeCount.Value;
+    // Proxy count for saving logic
+    int count = realtimeActivityCount.Value;
 
     var titleContent = isEditingName.Value
         ? Layout.Horizontal().Gap(2).Align(Align.Left)
@@ -127,12 +133,12 @@ public class BuilderView : ViewBase
                                 }
                                 else
                                 {
-                                  client.Toast("Failed to save cohort to server.", variant: AlertVariant.Destructive);
+                                  client.Toast("Failed to save cohort to server.");
                                 }
                               }
                               catch (Exception ex)
                               {
-                                client.Toast($"Error: {ex.Message}", variant: AlertVariant.Destructive);
+                                client.Toast($"Error: {ex.Message}");
                               }
                             })
                         | new Button("Export").Variant(ButtonVariant.Outline).Icon(Icons.Download).Width(Size.Units(60))
@@ -149,9 +155,14 @@ public class BuilderView : ViewBase
                         | new Button("Clear").Variant(ButtonVariant.Destructive).Icon(Icons.Trash2).Width(Size.Units(60))
                             .HandleClick(_ => canvasBlocks.Set(Array.Empty<string>()))))
                 | new Card(
-                    Layout.Vertical().Gap(1).Align(Align.Center)
-                | Text.H2(count > 0 ? count.ToString("N0") : "—")
-                        | Text.P("Realtime Count").Muted().Small()
+                    Layout.Horizontal().Gap(6).Align(Align.Center).Padding(2, 6)
+                        | (Layout.Vertical().Gap(1).Align(Align.Center)
+                            | Text.H2(realtimeAudienceCount.Value > 0 ? realtimeAudienceCount.Value.ToString("N0") : "—").Color(Colors.Blue)
+                            | Text.P("Matching Audience").Muted().Small())
+                        | Layout.Vertical().Width(Size.Units(1)).Height(Size.Units(40)).Background(Colors.Slate)
+                        | (Layout.Vertical().Gap(1).Align(Align.Center)
+                            | Text.H2(realtimeActivityCount.Value > 0 ? realtimeActivityCount.Value.ToString("N0") : "—").Color(Colors.Green)
+                            | Text.P("Matching Activity").Muted().Small())
                   ))
     );
 

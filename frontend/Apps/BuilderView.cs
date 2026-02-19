@@ -107,8 +107,8 @@ public class BuilderView : ViewBase
             .Where(b => (categoryFilter.Value == "All" || b.Category == categoryFilter.Value) && !canvasBlocks.Value.Contains(b.Id))
             .Select(b =>
                 (object)new Card(
-                    Layout.Horizontal().Gap(2).Align(Align.Center)
-                        | (Layout.Vertical().Gap(0)
+                    Layout.Horizontal().Gap(2).Align(Align.Center).Padding(1, 4)
+                        | (Layout.Vertical().Gap(1)
                             | Text.P(b.Label).Small()
                             | Text.P(b.Category).Small().Muted().Color(Colors.Purple))
                         | new Spacer()
@@ -251,7 +251,7 @@ public class BuilderView : ViewBase
         sidebarContent: sidebarContent,
         sidebarHeader: Layout.Vertical().Gap(2)
             | Text.Lead("Block")
-            | new SelectInput<string>(categoryFilter, new[] { "All", "EVENT", "FILTER" })
+            | new SelectInput<string>(categoryFilter, new[] { "All", "EVENT", "FILTER" }.ToOptions())
     );
 
     return (Layout.Vertical()

@@ -34,7 +34,7 @@ public class BehavioralOpsApp : ViewBase
       _ => new DashboardView()
     };
 
-    var header = new DashboardHeader(selectedTabIndex, () => { /* Global Import action */ });
+    var header = new DashboardHeader(selectedTabIndex, () => selectedTabIndex.Set(4));
 
     return new HeaderLayout(header, GetPageContent());
   }

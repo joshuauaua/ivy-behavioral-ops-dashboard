@@ -16,8 +16,8 @@ public class DashboardHeader(IState<int> selectedTab, Action onImportClick) : Vi
             .Add(RenderTabButton("Testing", 2))
         )
         .Add(new Spacer())
-        .Add(new Button("Import Data", onImportClick)
-            .Icon(Icons.FileUp)
+        .Add(new Button("New Cohort", onImportClick)
+            .Icon(Icons.Plus)
             .Variant(ButtonVariant.Primary));
   }
 

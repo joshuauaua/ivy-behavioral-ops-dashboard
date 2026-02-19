@@ -39,11 +39,7 @@ public class LibraryView : ViewBase
     var topBar = Layout.Horizontal().Gap(4).Align(Align.Center).Width(Size.Full())
         | (Layout.Vertical().Gap(1)
             | Text.H2("Cohort Library")
-            | Text.P("Browse, search, and manage your saved cohorts.").Muted())
-        | new Spacer()
-        | new Button("+ New Cohort")
-            .Variant(ButtonVariant.Primary)
-            .HandleClick(_ => _navigateTo("builder"));
+            | Text.P("Browse, search, and manage your saved cohorts.").Muted());
 
     // --- Search + filter row ---
     var searchAndFilter = Layout.Horizontal().Gap(4).Align(Align.Center).Width(Size.Full())

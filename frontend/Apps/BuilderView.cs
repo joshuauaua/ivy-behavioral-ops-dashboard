@@ -1,5 +1,8 @@
 namespace Frontend.Apps;
 
+using System.Net.Http.Json;
+using System.Net.Http;
+
 public class BuilderView : ViewBase
 {
   readonly IState<Cohort[]> _cohorts;
@@ -46,9 +49,25 @@ public class BuilderView : ViewBase
     );
     var operators = UseState(Array.Empty<string>());
     var categoryFilter = UseState("All");
+    var realtimeCount = UseState(0);
 
-    // Realtime count (number of blocks added as a proxy)
-    int count = canvasBlocks.Value.Length * 1247; // simulated count
+    UseEffect(async () =>
+    {
+      try
+      {
+        using var http = new HttpClient();
+        var response = await http.PostAsJsonAsync("http://localhost:5152/api/analytics/count", canvasBlocks.Value);
+        if (response.IsSuccessStatusCode)
+        {
+          var result = await response.Content.ReadFromJsonAsync<CountResponse>();
+          if (result != null) realtimeCount.Set(result.count);
+        }
+      }
+      catch { }
+    }, [canvasBlocks]);
+
+    // Proxy count for saving logic, but UI will use realtimeCount
+    int count = realtimeCount.Value;
 
     var titleContent = isEditingName.Value
         ? Layout.Horizontal().Gap(2).Align(Align.Left)
@@ -95,7 +114,7 @@ public class BuilderView : ViewBase
                             .HandleClick(_ => canvasBlocks.Set(Array.Empty<string>()))))
                 | new Card(
                     Layout.Vertical().Gap(1).Align(Align.Center)
-                        | Text.H2(count > 0 ? count.ToString("N0") : "—")
+                | Text.H2(count > 0 ? count.ToString("N0") : "—")
                         | Text.P("Realtime Count").Muted().Small()
                   ))
     );
@@ -258,4 +277,6 @@ public class BuilderView : ViewBase
         | layout
         | exportDialog);
   }
+
+  record CountResponse(int count);
 }

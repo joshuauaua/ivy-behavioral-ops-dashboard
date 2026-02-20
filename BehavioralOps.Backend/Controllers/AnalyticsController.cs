@@ -6,6 +6,9 @@ using BehavioralOps.Backend.Models;
 using System.Text;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
+using CsvHelper;
+using CsvHelper.Configuration;
 
 namespace BehavioralOps.Backend.Controllers;
 
@@ -309,6 +312,42 @@ public class AnalyticsController : ControllerBase
       e.Metadata
     });
     return Ok(result);
+  }
+
+  [HttpGet("google-sheets")]
+  public async Task<IActionResult> GetGoogleSheetsData()
+  {
+    try
+    {
+      using var http = new HttpClient();
+      var csvData = await http.GetStringAsync("https://docs.google.com/spreadsheets/d/1TmtiiC6UAzix8Cs6jg0zFbWVFG3lrCOvCDyyg5LEiks/export?format=csv");
+
+      using var reader = new StringReader(csvData);
+      using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+      {
+        HasHeaderRecord = true,
+      });
+
+      var records = new List<object>();
+      await csv.ReadAsync();
+      csv.ReadHeader();
+
+      while (await csv.ReadAsync())
+      {
+        records.Add(new
+        {
+          id = csv.GetField<int>("Google_Test_Action_ID"),
+          action = csv.GetField<string>("Google_Test_Action"),
+          dateTime = csv.GetField<string>("Google_Test_DateTime") ?? ""
+        });
+      }
+
+      return Ok(records);
+    }
+    catch (Exception ex)
+    {
+      return StatusCode(500, $"Error fetching Google Sheets data: {ex.Message}");
+    }
   }
 
   private async Task<int> CalculateCohortSize(string definition)

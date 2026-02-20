@@ -38,4 +38,7 @@ public record TrendItem(string month, int logins, int purchases, int signups, in
 public record ActivityItem(string cohort, string action, string timestamp, string user);
 public record CreateCohortRequest(string Name, string? Definition, string? AdminUser);
 public record DataTableUser(int id, string externalId, string email, string region, string country, string signupDate, bool highValue, double churnRisk, int onboardingFunnelBlock);
+public record GoogleTestAction(int id, string action, string dateTime);
+public record HeyreachCampaign(long id, string name, string status, HeyreachStats progressStats);
+public record HeyreachStats(int totalUsers, int totalUsersFinished);
 public record DataTableEvent(int id, string userEmail, string type, string timestamp, string metadata);

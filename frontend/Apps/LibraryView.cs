@@ -70,9 +70,9 @@ public class LibraryView : ViewBase
       grid = Layout.Grid().Columns(2).Gap(4)
           | filtered.Select(c =>
               (object)new Card(
-                  Layout.Vertical().Gap(3)
-                      | (Layout.Horizontal().Gap(3).Align(Align.Center)
-                          | (Layout.Vertical().Gap(1)
+                  Layout.Vertical().Gap(3).Align(Align.Left).Width(Size.Full())
+                      | (Layout.Horizontal().Gap(3).Align(Align.Center).Width(Size.Full())
+                          | (Layout.Vertical().Gap(1).Align(Align.Left)
                               | (Layout.Horizontal().Gap(2).Align(Align.Center)
                                   | Text.P(c.Name)
                                   | Text.P($"v{c.Version}").Muted().Small())

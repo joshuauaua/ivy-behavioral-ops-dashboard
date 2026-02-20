@@ -11,5 +11,7 @@ frontend/bin/
 frontend/obj/
 BehavioralOps.Backend/bin/
 BehavioralOps.Backend/obj/
-behavioral_ops.db
+
 behavioral_ops.db-journal
+behavioral_ops.db-shm
+behavioral_ops.db-wal

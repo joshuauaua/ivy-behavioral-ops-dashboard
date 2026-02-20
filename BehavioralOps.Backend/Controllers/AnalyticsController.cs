@@ -105,8 +105,8 @@ public class AnalyticsController : ControllerBase
       "region_asia" => props.TryGetValue("region", out var r) && r.ToString() == "Asia",
       "region_eu" => props.TryGetValue("region", out var r) && r.ToString() == "EU",
       "region_usa" => props.TryGetValue("region", out var r) && r.ToString() == "USA",
-      "high_value" => props.TryGetValue("high_value", out var hv) && hv is bool b && b,
-      "churn_risk" => props.TryGetValue("churn_risk", out var cr) && cr is bool b && b,
+      "high_value" => props.TryGetValue("high_value", out var hv) && (hv is bool b ? b : (hv is JsonElement j && j.ValueKind == JsonValueKind.True)),
+      "churn_risk" => props.TryGetValue("churn_risk", out var cr) && (cr is double d ? d > 0.5 : (cr is JsonElement j && j.ValueKind == JsonValueKind.Number && j.TryGetDouble(out var dv) && dv > 0.5)),
       "user_login" => userEvents.Any(e => e.Type == "user_login"),
       "purchase" => userEvents.Any(e => e.Type == "purchase"),
       "page_view" => userEvents.Any(e => e.Type == "page_view"),
@@ -130,41 +130,55 @@ public class AnalyticsController : ControllerBase
     }
     double avgSize = totalCohorts > 0 ? totalSize / totalCohorts : 0;
 
-    return Ok(new { totalUsers, totalCohorts, avgSize });
+    var result = new { totalUsers, totalCohorts, avgSize };
+    Console.WriteLine($"[Backend] GetStats: {totalUsers} users, {totalCohorts} cohorts. Result: {JsonSerializer.Serialize(result)}");
+    return Ok(result);
   }
 
   [HttpGet("distribution")]
   public async Task<IActionResult> GetDistribution()
   {
-    var cohorts = await _db.Cohorts.ToListAsync();
-    var sizes = new List<int>();
-    foreach (var cohort in cohorts)
+    var users = await _db.Users.ToListAsync();
+    var distribution = new List<object>();
+    var regions = new[] { "Asia", "EU", "USA" };
+
+    foreach (var region in regions)
     {
-      sizes.Add(await CalculateCohortSize(cohort.Definition));
+      int count = 0;
+      foreach (var user in users)
+      {
+        var props = JsonSerializer.Deserialize<Dictionary<string, object>>(user.Properties) ?? new();
+        if (props.TryGetValue("region", out var r) && r.ToString() == region)
+        {
+          count++;
+        }
+      }
+      distribution.Add(new { continent = region, count });
     }
 
-    var distribution = new[]
-    {
-      new { range = "0-40", count = sizes.Count(s => s <= 40) },
-      new { range = "41-80", count = sizes.Count(s => s > 40 && s <= 80) },
-      new { range = "81-120", count = sizes.Count(s => s > 80 && s <= 120) },
-      new { range = "121-160", count = sizes.Count(s => s > 120 && s <= 160) },
-      new { range = "161-200", count = sizes.Count(s => s > 160) }
-    };
-
+    Console.WriteLine($"[Backend] GetDistribution: {distribution.Count} items.");
     return Ok(distribution);
   }
 
   [HttpGet("trend")]
   public async Task<IActionResult> GetTrend()
   {
-    var cohorts = await _db.Cohorts.ToListAsync();
-    var trend = cohorts
-        .GroupBy(c => c.CreatedAt.ToString("MMM"))
-        .Select(g => new { Month = g.Key, Cohorts = g.Count() })
+    var events = await _db.Events.ToListAsync();
+    var lastSixMonths = Enumerable.Range(0, 6)
+        .Select(i => DateTime.UtcNow.AddMonths(-i))
+        .Reverse()
         .ToList();
 
-    // Ensure we have some months even if data is thin
+    var trend = lastSixMonths.Select(m => new
+    {
+      month = m.ToString("MMM"),
+      logins = events.Count(e => e.Type == "user_login" && e.Timestamp.Month == m.Month && e.Timestamp.Year == m.Year),
+      purchases = events.Count(e => e.Type == "purchase" && e.Timestamp.Month == m.Month && e.Timestamp.Year == m.Year),
+      signups = events.Count(e => e.Type == "user_signup" && e.Timestamp.Month == m.Month && e.Timestamp.Year == m.Year),
+      views = events.Count(e => e.Type == "page_view" && e.Timestamp.Month == m.Month && e.Timestamp.Year == m.Year)
+    }).ToList();
+
+    Console.WriteLine($"[Backend] GetTrend: {trend.Count} months.");
     return Ok(trend);
   }
 
@@ -177,10 +191,10 @@ public class AnalyticsController : ControllerBase
         .Take(10)
         .Select(l => new
         {
-          Cohort = l.Cohort != null ? l.Cohort.Name : "Unknown",
-          Action = l.Action.ToString(),
-          Timestamp = FormatTimestamp(l.Timestamp),
-          User = l.AdminUser
+          cohort = l.Cohort != null ? l.Cohort.Name : "Unknown",
+          action = l.Action.ToString(),
+          timestamp = FormatTimestamp(l.Timestamp),
+          user = l.AdminUser
         })
         .ToListAsync();
 
@@ -257,6 +271,44 @@ public class AnalyticsController : ControllerBase
       }
       return File(ms.ToArray(), "text/csv", "export.csv");
     }
+  }
+
+  [HttpGet("users")]
+  public async Task<IActionResult> GetUsers()
+  {
+    var users = await _db.Users.ToListAsync();
+    var result = users.Select(u =>
+    {
+      var props = JsonSerializer.Deserialize<Dictionary<string, object>>(u.Properties) ?? new();
+      return new
+      {
+        u.Id,
+        u.ExternalId,
+        Email = props.TryGetValue("email", out var e) ? e.ToString() : "",
+        Region = props.TryGetValue("region", out var r) ? r.ToString() : "",
+        Country = props.TryGetValue("country", out var c) ? c.ToString() : "",
+        SignupDate = props.TryGetValue("signup_date", out var s) ? s.ToString() : "",
+        HighValue = props.TryGetValue("high_value", out var hv) && (hv is bool b ? b : (hv is JsonElement jh && jh.ValueKind == JsonValueKind.True)),
+        ChurnRisk = props.TryGetValue("churn_risk", out var cr) ? (cr is double d ? d : (cr is JsonElement jc && jc.ValueKind == JsonValueKind.Number && jc.TryGetDouble(out var v) ? v : 0.0)) : 0.0,
+        OnboardingFunnelBlock = props.TryGetValue("onboarding_funnel_block", out var ofb) ? (ofb is int i ? i : (ofb is JsonElement jf && jf.ValueKind == JsonValueKind.Number && jf.TryGetInt32(out var f) ? f : 0)) : 0
+      };
+    });
+    return Ok(result);
+  }
+
+  [HttpGet("events")]
+  public async Task<IActionResult> GetEvents()
+  {
+    var events = await _db.Events.Include(e => e.User).OrderByDescending(e => e.Timestamp).Take(1000).ToListAsync();
+    var result = events.Select(e => new
+    {
+      e.Id,
+      UserEmail = e.User?.ExternalId ?? "Unknown",
+      e.Type,
+      Timestamp = e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+      e.Metadata
+    });
+    return Ok(result);
   }
 
   private async Task<int> CalculateCohortSize(string definition)

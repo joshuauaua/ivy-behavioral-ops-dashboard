@@ -15,7 +15,19 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
         ?? "Data Source=behavioral_ops.db"));
 
+builder.Services.AddCors(options =>
+{
+  options.AddDefaultPolicy(policy =>
+  {
+    policy.AllowAnyOrigin()
+          .AllowAnyHeader()
+          .AllowAnyMethod();
+  });
+});
+
 var app = builder.Build();
+
+app.UseCors();
 
 using (var scope = app.Services.CreateScope())
 {

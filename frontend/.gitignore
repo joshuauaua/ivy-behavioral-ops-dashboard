@@ -3,3 +3,6 @@ obj/
 *.sln.iml
 .idea/**/*
 **/.idea/*
+
+behavioral_ops.db-shm
+behavioral_ops.db-wal

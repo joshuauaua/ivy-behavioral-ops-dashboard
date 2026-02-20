@@ -17,18 +17,19 @@ public class DashboardView : ViewBase
     var sizeDistData = UseState(Array.Empty<DistributionItem>());
     var trendData = UseState(Array.Empty<TrendItem>());
     var activityData = UseState(Array.Empty<ActivityItem>());
+    var isLoading = UseState(true);
 
-    Console.WriteLine($"[Frontend] DashboardView Build called. Tab: {selectedTab.Value}, Dist: {sizeDistData.Value.Length}, Trend: {trendData.Value.Length}");
+    Console.WriteLine($"[Frontend] DashboardView Build called. Tab: {selectedTab.Value}, Dist: {sizeDistData.Value.Length}, Trend: {trendData.Value.Length}, Loading: {isLoading.Value}");
 
     UseEffect(async () =>
     {
       try
       {
+        isLoading.Set(true);
         using var http = new HttpClient();
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
         var statsJson = await http.GetStringAsync("http://localhost:5152/api/analytics/stats");
-        Console.WriteLine($"[Frontend] Stats JSON: {statsJson}");
         var stats = JsonSerializer.Deserialize<StatsResponse>(statsJson, options);
         if (stats != null)
         {
@@ -38,25 +39,36 @@ public class DashboardView : ViewBase
         }
 
         var distJson = await http.GetStringAsync("http://localhost:5152/api/analytics/distribution");
-        Console.WriteLine($"[Frontend] Dist JSON: {distJson}");
         var dist = JsonSerializer.Deserialize<DistributionItem[]>(distJson, options);
         if (dist != null) sizeDistData.Set(dist);
 
         var trendJson = await http.GetStringAsync("http://localhost:5152/api/analytics/trend");
-        Console.WriteLine($"[Frontend] Trend JSON: {trendJson}");
         var trend = JsonSerializer.Deserialize<TrendItem[]>(trendJson, options);
         if (trend != null) trendData.Set(trend);
 
         var activityJson = await http.GetStringAsync("http://localhost:5152/api/analytics/activity");
-        Console.WriteLine($"[Frontend] Activity JSON: {activityJson}");
         var activity = JsonSerializer.Deserialize<ActivityItem[]>(activityJson, options);
         if (activity != null) activityData.Set(activity);
+
+        Console.WriteLine($"[Frontend] SUCCESS: Fetched all dashboard data. Dist count: {dist?.Length ?? 0}");
       }
       catch (Exception ex)
       {
         Console.WriteLine($"[Frontend] ERROR fetching dashboard data: {ex.GetType().Name} - {ex.Message}");
       }
+      finally
+      {
+        isLoading.Set(false);
+      }
     }, []);
+
+    if (isLoading.Value && sizeDistData.Value.Length == 0)
+    {
+      return Layout.Center().Height(Size.Units(100))
+          | (Layout.Vertical().Gap(2).Align(Align.Center)
+              | new Icon(Icons.RefreshCcw)
+              | Text.P("Loading dashboard data...").Muted());
+    }
 
     // --- Stat cards ---
     object StatCard(Icons icon, string label, string value) =>
